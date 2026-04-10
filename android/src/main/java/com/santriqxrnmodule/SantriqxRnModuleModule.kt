@@ -13,41 +13,34 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
     NativeSantriqxRnModuleSpec(reactContext) {
 
     companion object {
-        const val NAME = NativeSantriqxRnModuleSpec.NAME
+        const val NAME = "SantriqxRnModule"
         private const val TAG = "SantriqxRnModule"
         private const val FACE_REQUEST_CODE = 2004
         private const val RECORDING_REQUEST_CODE = 2001
     }
 
+    // ← FIX: getName add karo
+    override fun getName() = NAME
+
     private var gyroscopeSDK: GyroscopeSDK? = null
     private var pendingRecordingPromise: Promise? = null
     private var pendingFacePromise: Promise? = null
 
-    // ── Init SDK ──
     override fun initSdk(appId: String, apiSecretKey: String, baseUrl: String, promise: Promise) {
         try {
-            SantriqxSDK.init(
-                appId = appId,
-                apiSecretKey = apiSecretKey,
-                baseUrl = baseUrl
-            )
-            Log.d(TAG, "✅ SDK initialized")
+            SantriqxSDK.init(appId = appId, apiSecretKey = apiSecretKey, baseUrl = baseUrl)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("INIT_ERROR", e.message)
         }
     }
 
-    // ── Register Device ──
     override fun registerDevice(promise: Promise) {
         SantriqxSDK.registerDevice(reactApplicationContext) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Get Device Info ──
     override fun getDeviceInfo(promise: Promise) {
         DeviceService.getFullDeviceInfo(reactApplicationContext) { info ->
             reactApplicationContext.runOnUiQueueThread {
@@ -58,18 +51,15 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    // ── Fetch Config ──
     override fun fetchConfig(promise: Promise) {
         SantriqxSDK.fetchConfig { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Start Recording ──
     override fun startRecording(promise: Promise) {
-        val activity = currentActivity ?: run {
+        // ← FIX: currentActivity ki jagah reactApplicationContext.currentActivity
+        val activity = reactApplicationContext.currentActivity ?: run {
             promise.reject("NO_ACTIVITY", "Activity not available")
             return
         }
@@ -96,7 +86,6 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         )
     }
 
-    // ── Stop Recording ──
     override fun stopRecording(promise: Promise) {
         try {
             SantriqxSDK.stopRecording(reactApplicationContext)
@@ -106,16 +95,12 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    // ── Get Stream Details ──
     override fun getStreamDetails(streamKey: String, promise: Promise) {
         SantriqxSDK.getStreamDetails(streamKey) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Start Gyroscope ──
     override fun startGyroscope(promise: Promise) {
         try {
             gyroscopeSDK = GyroscopeSDK(reactApplicationContext)
@@ -135,30 +120,21 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    // ── Stop Gyroscope ──
     override fun stopGyroscope(promise: Promise) {
         gyroscopeSDK?.stop()
         promise.resolve(true)
     }
 
-    // ── Send Sensor Data ──
-    override fun sendSensorData(
-        gx: Double, gy: Double, gz: Double,
-        ax: Double, ay: Double, az: Double,
-        promise: Promise
-    ) {
-        SantriqxSDK.sendSensorData(
-            reactApplicationContext, gx, gy, gz, ax, ay, az
-        ) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+    override fun sendSensorData(gx: Double, gy: Double, gz: Double,
+                                ax: Double, ay: Double, az: Double, promise: Promise) {
+        SantriqxSDK.sendSensorData(reactApplicationContext, gx, gy, gz, ax, ay, az) { result ->
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Open Face Recognition ──
     override fun openFaceRecognition(promise: Promise) {
-        val activity = currentActivity ?: run {
+        // ← FIX: currentActivity ki jagah reactApplicationContext.currentActivity
+        val activity = reactApplicationContext.currentActivity ?: run {
             promise.reject("NO_ACTIVITY", "Activity not available")
             return
         }
@@ -172,43 +148,32 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    // ── Upload Face ──
     override fun uploadFace(imagePath: String, username: String, promise: Promise) {
         SantriqxSDK.uploadFace(reactApplicationContext, imagePath, username) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Record Transaction ──
     override fun recordTransaction(fields: ReadableMap, promise: Promise) {
         val map = mutableMapOf<String, String>()
         fields.toHashMap().forEach { (k, v) -> map[k] = v.toString() }
         SantriqxSDK.recordTransaction(reactApplicationContext, map) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Get Transactions ──
     override fun getTransactions(promise: Promise) {
         SantriqxSDK.getTransactions(reactApplicationContext) { result ->
-            reactApplicationContext.runOnUiQueueThread {
-                promise.resolve(convertMap(result))
-            }
+            reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
-    // ── Helper: Send Event to JS ──
     private fun sendEvent(eventName: String, params: WritableMap) {
         reactApplicationContext
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
             .emit(eventName, params)
     }
 
-    // ── Helper: Convert Map ──
     private fun convertMap(map: Map<String, Any?>): WritableNativeMap {
         val writableMap = WritableNativeMap()
         map.forEach { (k, v) ->
