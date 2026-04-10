@@ -49,23 +49,6 @@ android {
   }
 }
 
-repositories {
-  google()
-  mavenCentral()
-  maven { url = uri("https://jitpack.io") }
-
-  // Santriqx GitLab SDK
-  maven {
-    url = uri("https://gitlab.com/api/v4/projects/81120461/packages/maven")
-    credentials(HttpHeaderCredentials) {
-      name = "Deploy-Token"
-      value = "gldt-EX38JE9vrPLKU89eWbtL"
-    }
-    authentication {
-      header(HttpHeaderAuthentication)
-    }
-  }
-}
 
 dependencies {
   implementation "com.facebook.react:react-android"
