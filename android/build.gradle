@@ -5,63 +5,70 @@ buildscript {
     compileSdkVersion: 36,
     targetSdkVersion: 36
   ]
-
   ext.getExtOrDefault = { prop ->
     if (rootProject.ext.has(prop)) {
       return rootProject.ext.get(prop)
     }
-
     return SantriqxRnModule[prop]
   }
-
   repositories {
     google()
     mavenCentral()
   }
-
   dependencies {
     classpath "com.android.tools.build:gradle:8.7.2"
-    // noinspection DifferentKotlinGradleVersion
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
   }
 }
 
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
-
 apply plugin: "com.facebook.react"
 
 android {
   namespace "com.santriqxrnmodule"
-
   compileSdkVersion getExtOrDefault("compileSdkVersion")
-
   defaultConfig {
     minSdkVersion getExtOrDefault("minSdkVersion")
     targetSdkVersion getExtOrDefault("targetSdkVersion")
   }
-
   buildFeatures {
     buildConfig true
   }
-
   buildTypes {
     release {
       minifyEnabled false
     }
   }
-
   lint {
     disable "GradleCompatible"
   }
-
   compileOptions {
     sourceCompatibility JavaVersion.VERSION_1_8
     targetCompatibility JavaVersion.VERSION_1_8
   }
 }
 
+repositories {
+  google()
+  mavenCentral()
+  maven { url = uri("https://jitpack.io") }
+
+  // Santriqx GitLab SDK
+  maven {
+    url = uri("https://gitlab.com/api/v4/projects/81120461/packages/maven")
+    credentials(HttpHeaderCredentials) {
+      name = "Deploy-Token"
+      value = "gldt-EX38JE9vrPLKU89eWbtL"
+    }
+    authentication {
+      header(HttpHeaderAuthentication)
+    }
+  }
+}
+
 dependencies {
   implementation "com.facebook.react:react-android"
+  implementation "com.earnscape:gyroscope-sdk:1.0.0"
+  implementation "androidx.localbroadcastmanager:localbroadcastmanager:1.1.0"
 }
