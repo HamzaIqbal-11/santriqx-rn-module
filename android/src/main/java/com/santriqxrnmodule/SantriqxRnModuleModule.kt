@@ -1,5 +1,7 @@
 package com.santriqxrnmodule
 
+import android.app.Activity
+import android.content.Intent
 import android.util.Log
 import com.earnscape.gyroscopesdk.SantriqxSDK
 import com.earnscape.gyroscopesdk.GyroscopeSDK
@@ -7,10 +9,9 @@ import com.earnscape.gyroscopesdk.DeviceService
 import com.example.gyroscope.kyc.FaceRecognitionActivity
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import android.content.Intent
 
 class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
-    NativeSantriqxRnModuleSpec(reactContext) {
+    NativeSantriqxRnModuleSpec(reactContext), ActivityEventListener {
 
     companion object {
         const val NAME = "SantriqxRnModule"
@@ -19,16 +20,69 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         private const val RECORDING_REQUEST_CODE = 2001
     }
 
-    // ← FIX: getName add karo
+    init {
+        reactContext.addActivityEventListener(this)
+    }
+
     override fun getName() = NAME
 
     private var gyroscopeSDK: GyroscopeSDK? = null
     private var pendingRecordingPromise: Promise? = null
     private var pendingFacePromise: Promise? = null
 
+    // ── ActivityEventListener ──
+    override fun onActivityResult(
+        activity: Activity,
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        if (requestCode == RECORDING_REQUEST_CODE) {
+            SantriqxSDK.handleRecordingResult(
+                activity = activity,
+                requestCode = requestCode,
+                expectedCode = RECORDING_REQUEST_CODE,
+                resultCode = resultCode,
+                data = data,
+                onGranted = {
+                    Log.d(TAG, "✅ Recording started")
+                },
+                onDenied = {
+                    Log.e(TAG, "❌ Recording denied")
+                    reactApplicationContext.runOnUiQueueThread {
+                        pendingRecordingPromise?.reject("RECORDING_DENIED", "Permission denied")
+                        pendingRecordingPromise = null
+                    }
+                }
+            )
+        }
+
+        if (requestCode == FACE_REQUEST_CODE) {
+            val facePromise = pendingFacePromise
+            pendingFacePromise = null
+            reactApplicationContext.runOnUiQueueThread {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    val imagePath = data.getStringExtra("imagePath") ?: ""
+                    val map = WritableNativeMap()
+                    map.putBoolean("success", true)
+                    map.putString("imagePath", imagePath)
+                    facePromise?.resolve(map)
+                } else {
+                    val map = WritableNativeMap()
+                    map.putBoolean("success", false)
+                    facePromise?.resolve(map)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {}
+
+    // ── Init SDK ──
     override fun initSdk(appId: String, apiSecretKey: String, baseUrl: String, promise: Promise) {
         try {
             SantriqxSDK.init(appId = appId, apiSecretKey = apiSecretKey, baseUrl = baseUrl)
+            Log.d(TAG, "✅ SDK initialized")
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("INIT_ERROR", e.message)
@@ -58,7 +112,6 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
     }
 
     override fun startRecording(promise: Promise) {
-        // ← FIX: currentActivity ki jagah reactApplicationContext.currentActivity
         val activity = reactApplicationContext.currentActivity ?: run {
             promise.reject("NO_ACTIVITY", "Activity not available")
             return
@@ -125,15 +178,17 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         promise.resolve(true)
     }
 
-    override fun sendSensorData(gx: Double, gy: Double, gz: Double,
-                                ax: Double, ay: Double, az: Double, promise: Promise) {
+    override fun sendSensorData(
+        gx: Double, gy: Double, gz: Double,
+        ax: Double, ay: Double, az: Double,
+        promise: Promise
+    ) {
         SantriqxSDK.sendSensorData(reactApplicationContext, gx, gy, gz, ax, ay, az) { result ->
             reactApplicationContext.runOnUiQueueThread { promise.resolve(convertMap(result)) }
         }
     }
 
     override fun openFaceRecognition(promise: Promise) {
-        // ← FIX: currentActivity ki jagah reactApplicationContext.currentActivity
         val activity = reactApplicationContext.currentActivity ?: run {
             promise.reject("NO_ACTIVITY", "Activity not available")
             return
@@ -188,53 +243,4 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
         return writableMap
     }
- override fun onActivityResult(
-        activity: Activity?,
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
-    ) {
-        if (requestCode == RECORDING_REQUEST_CODE && activity != null) {
-            SantriqxSDK.handleRecordingResult(
-                activity = activity,
-                requestCode = requestCode,
-                expectedCode = RECORDING_REQUEST_CODE,
-                resultCode = resultCode,
-                data = data,
-                onGranted = {
-                    Log.d(TAG, "✅ Recording started")
-                },
-                onDenied = {
-                    Log.e(TAG, "❌ Recording denied")
-                    reactApplicationContext.runOnUiQueueThread {
-                        pendingRecordingPromise?.reject("RECORDING_DENIED", "Permission denied")
-                        pendingRecordingPromise = null
-                    }
-                }
-            )
-        }
-
-        if (requestCode == FACE_REQUEST_CODE) {
-            val facePromise = pendingFacePromise
-            pendingFacePromise = null
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                val imagePath = data.getStringExtra("imagePath") ?: ""
-                reactApplicationContext.runOnUiQueueThread {
-                    val map = WritableNativeMap()
-                    map.putBoolean("success", true)
-                    map.putString("imagePath", imagePath)
-                    facePromise?.resolve(map)
-                }
-            } else {
-                reactApplicationContext.runOnUiQueueThread {
-                    val map = WritableNativeMap()
-                    map.putBoolean("success", false)
-                    facePromise?.resolve(map)
-                }
-            }
-        }
-    }
-
-    override fun onNewIntent(intent: Intent?) {}
-
 }
