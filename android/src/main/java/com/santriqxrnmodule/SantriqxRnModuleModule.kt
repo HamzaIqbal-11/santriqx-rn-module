@@ -188,4 +188,53 @@ class SantriqxRnModuleModule(reactContext: ReactApplicationContext) :
         }
         return writableMap
     }
+ override fun onActivityResult(
+        activity: Activity?,
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        if (requestCode == RECORDING_REQUEST_CODE && activity != null) {
+            SantriqxSDK.handleRecordingResult(
+                activity = activity,
+                requestCode = requestCode,
+                expectedCode = RECORDING_REQUEST_CODE,
+                resultCode = resultCode,
+                data = data,
+                onGranted = {
+                    Log.d(TAG, "✅ Recording started")
+                },
+                onDenied = {
+                    Log.e(TAG, "❌ Recording denied")
+                    reactApplicationContext.runOnUiQueueThread {
+                        pendingRecordingPromise?.reject("RECORDING_DENIED", "Permission denied")
+                        pendingRecordingPromise = null
+                    }
+                }
+            )
+        }
+
+        if (requestCode == FACE_REQUEST_CODE) {
+            val facePromise = pendingFacePromise
+            pendingFacePromise = null
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val imagePath = data.getStringExtra("imagePath") ?: ""
+                reactApplicationContext.runOnUiQueueThread {
+                    val map = WritableNativeMap()
+                    map.putBoolean("success", true)
+                    map.putString("imagePath", imagePath)
+                    facePromise?.resolve(map)
+                }
+            } else {
+                reactApplicationContext.runOnUiQueueThread {
+                    val map = WritableNativeMap()
+                    map.putBoolean("success", false)
+                    facePromise?.resolve(map)
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {}
+
 }
